@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id           String        @id @default(uuid()) @db.Uuid
+  eventName    String
+  coupleNames  String
+  eventDate    DateTime      @db.Date
+  createdAt    DateTime      @default(now())
+  guestUploads GuestUpload[]
+
+  @@index([eventDate])
+  @@index([createdAt])
+}
+
+model GuestUpload {
+  id        String   @id @default(uuid()) @db.Uuid
+  guestName String?
+  eventId   String   @db.Uuid
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  photos    Photo[]
+
+  @@index([eventId])
+  @@index([createdAt])
+}
+
+model Photo {
+  id          String      @id @default(uuid()) @db.Uuid
+  uploadId    String      @db.Uuid
+  imageUrl    String
+  storagePath String
+  isApproved  Boolean     @default(false)
+  isFeatured  Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  upload      GuestUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@index([uploadId])
+  @@index([createdAt])
+  @@index([isApproved, createdAt])
+}
+
+model AdminUser {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
