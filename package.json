@@ -12,7 +12,6 @@
     "prisma:push": "prisma db push"
   },
   "dependencies": {
-    "@ably-labs/react-hooks": "^2.0.0",
     "@hookform/resolvers": "^3.9.1",
     "@prisma/client": "^6.7.0",
     "@radix-ui/react-accordion": "1.2.12",
@@ -57,7 +56,6 @@
     "lucide-react": "^0.564.0",
     "next": "16.2.0",
     "next-themes": "^0.4.6",
-    "postgres": "^3.4.5",
     "react": "^19",
     "react-day-picker": "9.13.2",
     "react-dom": "^19",

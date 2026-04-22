@@ -54,7 +54,11 @@ export const deletePhotoFromStorage = async (storagePath: string) => {
 export const movePhotoToFeaturedStorage = async (storagePath: string) => {
   const featuredPath = storagePath.replace("/uploads/", "/featured/");
   if (featuredPath === storagePath) {
-    return storagePath;
+    const { data } = supabaseAdmin.storage.from(env.SUPABASE_STORAGE_BUCKET).getPublicUrl(storagePath);
+    return {
+      storagePath,
+      publicUrl: data.publicUrl,
+    };
   }
 
   const bucket = supabaseAdmin.storage.from(env.SUPABASE_STORAGE_BUCKET);

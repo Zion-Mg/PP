@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Playfair_Display, Lato } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 const playfair = Playfair_Display({ 
@@ -47,6 +48,7 @@ export default function RootLayout({
     <html lang="en" className={`${playfair.variable} ${lato.variable} bg-background`}>
       <body className="font-sans antialiased">
         {children}
+        <Toaster richColors position="top-right" />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

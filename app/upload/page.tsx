@@ -1,19 +1,21 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDropzone } from "react-dropzone";
 import Link from "next/link";
-import Image from "next/image";
-import { 
-  Upload, 
-  X, 
-  Check, 
-  ImagePlus, 
+import {
+  Upload,
+  X,
+  Check,
+  ImagePlus,
   ArrowLeft,
   Heart,
-  Images
+  Images,
+  LoaderCircle,
 } from "lucide-react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -25,68 +27,139 @@ interface UploadedFile {
   progress: number;
 }
 
+interface EventPayload {
+  id: string;
+  eventName: string;
+  coupleNames: string;
+  eventDate: string;
+}
+
 export default function UploadPage() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [uploaderName, setUploaderName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
+  const [event, setEvent] = useState<EventPayload | null>(null);
+  const [isLoadingEvent, setIsLoadingEvent] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchEvent = async () => {
+      try {
+        const response = await fetch("/api/event/current");
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Unable to load the active event.");
+        }
+
+        if (active) {
+          setEvent(data.event);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to load the active event.";
+        toast.error(message);
+      } finally {
+        if (active) {
+          setIsLoadingEvent(false);
+        }
+      }
+    };
+
+    void fetchEvent();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const remainingSlots = 5 - files.length;
-    const filesToAdd = acceptedFiles.slice(0, remainingSlots);
-    
-    const newFiles: UploadedFile[] = filesToAdd.map((file) => ({
-      id: Math.random().toString(36).substring(7),
-      file,
-      preview: URL.createObjectURL(file),
-      progress: 0,
-    }));
+    setFiles((prev) => {
+      const remainingSlots = 5 - prev.length;
+      const filesToAdd = acceptedFiles.slice(0, remainingSlots);
 
-    setFiles((prev) => [...prev, ...newFiles]);
-  }, [files.length]);
+      const newFiles = filesToAdd.map((file) => ({
+        id: crypto.randomUUID(),
+        file,
+        preview: URL.createObjectURL(file),
+        progress: 0,
+      }));
+
+      return [...prev, ...newFiles];
+    });
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      "image/*": [".jpeg", ".jpg", ".png", ".webp"],
+      "image/jpeg": [".jpeg", ".jpg"],
+      "image/png": [".png"],
+      "image/webp": [".webp"],
     },
     maxFiles: 5 - files.length,
-    disabled: files.length >= 5,
+    maxSize: 10 * 1024 * 1024,
+    disabled: files.length >= 5 || isUploading,
   });
 
   const removeFile = (id: string) => {
     setFiles((prev) => {
-      const fileToRemove = prev.find((f) => f.id === id);
+      const fileToRemove = prev.find((file) => file.id === id);
       if (fileToRemove) {
         URL.revokeObjectURL(fileToRemove.preview);
       }
-      return prev.filter((f) => f.id !== id);
+
+      return prev.filter((file) => file.id !== id);
     });
   };
 
   const handleSubmit = async () => {
-    if (files.length === 0) return;
-    
-    setIsUploading(true);
-
-    // Simulate upload progress for each file
-    for (let i = 0; i < files.length; i++) {
-      for (let progress = 0; progress <= 100; progress += 10) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        setFiles((prev) =>
-          prev.map((f, idx) =>
-            idx === i ? { ...f, progress } : f
-          )
-        );
-      }
+    if (files.length === 0) {
+      return;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setIsUploading(false);
-    setIsComplete(true);
+    setIsUploading(true);
+
+    try {
+      setFiles((prev) => prev.map((file) => ({ ...file, progress: 20 })));
+
+      const formData = new FormData();
+      if (event?.id) {
+        formData.set("eventId", event.id);
+      }
+
+      if (uploaderName.trim()) {
+        formData.set("guestName", uploaderName.trim());
+      }
+
+      files.forEach((file) => {
+        formData.append("photos", file.file);
+      });
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Upload failed.");
+      }
+
+      setFiles((prev) => prev.map((file) => ({ ...file, progress: 100 })));
+      setUploadMessage(data.message);
+      setIsComplete(true);
+      toast.success("Photos uploaded successfully.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Upload failed.";
+      toast.error(message);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
-  // Success Screen
   if (isComplete) {
     return (
       <main className="min-h-screen bg-background">
@@ -130,7 +203,7 @@ export default function UploadPage() {
             transition={{ delay: 0.7 }}
             className="mt-6 text-center font-sans text-muted-foreground"
           >
-            {files.length} {files.length === 1 ? "photo" : "photos"} uploaded successfully
+            {uploadMessage || `${files.length} photos uploaded successfully.`}
           </motion.p>
 
           <motion.div
@@ -152,9 +225,11 @@ export default function UploadPage() {
               size="lg"
               variant="outline"
               onClick={() => {
+                files.forEach((file) => URL.revokeObjectURL(file.preview));
                 setFiles([]);
                 setIsComplete(false);
                 setUploaderName("");
+                setUploadMessage("");
               }}
               className="min-w-[180px] rounded-full border-border px-8 font-sans"
             >
@@ -168,7 +243,6 @@ export default function UploadPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <Link
@@ -189,15 +263,19 @@ export default function UploadPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
         >
-          <h2 className="font-serif text-3xl text-foreground sm:text-4xl">
-            Share Your Moments
-          </h2>
+          <h2 className="font-serif text-3xl text-foreground sm:text-4xl">Share Your Moments</h2>
           <p className="mt-3 font-sans text-muted-foreground">
-            Upload up to 5 photos from the wedding
+            Upload up to 5 photos in JPEG, PNG, or WEBP format.
+          </p>
+          <p className="mt-2 font-sans text-sm text-muted-foreground">
+            {isLoadingEvent
+              ? "Loading event details..."
+              : event
+                ? `Uploading to ${event.coupleNames} - ${event.eventName}`
+                : "An active event is required before guests can upload."}
           </p>
         </motion.div>
 
-        {/* Upload Area */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -206,49 +284,35 @@ export default function UploadPage() {
         >
           <div
             {...getRootProps()}
-            className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-300 ${
+            className={`relative rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-300 ${
               isDragActive
                 ? "border-primary bg-primary/5"
-                : files.length >= 5
-                ? "border-border bg-muted/30 cursor-not-allowed"
-                : "border-border hover:border-primary/50 hover:bg-muted/30"
+                : files.length >= 5 || isUploading
+                  ? "cursor-not-allowed border-border bg-muted/30"
+                  : "cursor-pointer border-border hover:border-primary/50 hover:bg-muted/30"
             }`}
           >
             <input {...getInputProps()} />
             <div className="flex flex-col items-center gap-4">
-              <div className={`rounded-full p-4 ${
-                isDragActive ? "bg-primary/10" : "bg-muted"
-              }`}>
-                <ImagePlus className={`h-8 w-8 ${
-                  isDragActive ? "text-primary" : "text-muted-foreground"
-                }`} />
+              <div className={`rounded-full p-4 ${isDragActive ? "bg-primary/10" : "bg-muted"}`}>
+                <ImagePlus className={`h-8 w-8 ${isDragActive ? "text-primary" : "text-muted-foreground"}`} />
               </div>
               {files.length >= 5 ? (
-                <p className="font-sans text-muted-foreground">
-                  Maximum 5 photos reached
-                </p>
+                <p className="font-sans text-muted-foreground">Maximum 5 photos reached</p>
               ) : (
                 <>
                   <p className="font-sans text-foreground">
-                    {isDragActive
-                      ? "Drop your photos here"
-                      : "Drag & drop photos here"}
+                    {isDragActive ? "Drop your photos here" : "Drag & drop photos here"}
                   </p>
-                  <p className="font-sans text-sm text-muted-foreground">
-                    or click to browse
-                  </p>
+                  <p className="font-sans text-sm text-muted-foreground">or click to browse</p>
                 </>
               )}
             </div>
           </div>
 
-          {/* File Counter */}
-          <p className="mt-3 text-center font-sans text-sm text-muted-foreground">
-            {files.length}/5 photos selected
-          </p>
+          <p className="mt-3 text-center font-sans text-sm text-muted-foreground">{files.length}/5 photos selected</p>
         </motion.div>
 
-        {/* Preview Grid */}
         <AnimatePresence>
           {files.length > 0 && (
             <motion.div
@@ -267,34 +331,23 @@ export default function UploadPage() {
                     transition={{ delay: index * 0.05 }}
                     className="group relative aspect-square overflow-hidden rounded-xl bg-muted"
                   >
-                    <Image
-                      src={file.preview}
-                      alt={`Preview ${index + 1}`}
-                      fill
-                      className="object-cover"
-                    />
-                    
-                    {/* Progress overlay during upload */}
-                    {isUploading && file.progress < 100 && (
+                    <img src={file.preview} alt={`Preview ${index + 1}`} className="h-full w-full object-cover" />
+
+                    {isUploading && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60">
-                        <Upload className="mb-2 h-6 w-6 animate-pulse text-white" />
-                        <Progress 
-                          value={file.progress} 
-                          className="h-1 w-3/4"
-                        />
+                        {file.progress < 100 ? (
+                          <>
+                            <Upload className="mb-2 h-6 w-6 animate-pulse text-white" />
+                            <Progress value={file.progress} className="h-1 w-3/4" />
+                          </>
+                        ) : (
+                          <div className="rounded-full bg-primary p-2">
+                            <Check className="h-5 w-5 text-primary-foreground" />
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* Success overlay */}
-                    {isUploading && file.progress === 100 && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                        <div className="rounded-full bg-primary p-2">
-                          <Check className="h-5 w-5 text-primary-foreground" />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Remove button */}
                     {!isUploading && (
                       <button
                         onClick={() => removeFile(file.id)}
@@ -310,26 +363,22 @@ export default function UploadPage() {
           )}
         </AnimatePresence>
 
-        {/* Name Input */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="mt-8"
         >
-          <label className="block font-sans text-sm font-medium text-foreground">
-            Your Name (optional)
-          </label>
+          <label className="block font-sans text-sm font-medium text-foreground">Your Name (optional)</label>
           <Input
             type="text"
             placeholder="Enter your name"
             value={uploaderName}
-            onChange={(e) => setUploaderName(e.target.value)}
+            onChange={(event) => setUploaderName(event.target.value)}
             className="mt-2 rounded-xl border-border bg-card font-sans"
           />
         </motion.div>
 
-        {/* Submit Button */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -339,12 +388,12 @@ export default function UploadPage() {
           <Button
             size="lg"
             onClick={handleSubmit}
-            disabled={files.length === 0 || isUploading}
+            disabled={files.length === 0 || isUploading || !event}
             className="w-full rounded-full bg-primary py-6 font-sans text-base font-medium text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-50"
           >
             {isUploading ? (
               <span className="flex items-center gap-2">
-                <Upload className="h-5 w-5 animate-pulse" />
+                <LoaderCircle className="h-5 w-5 animate-spin" />
                 Uploading...
               </span>
             ) : (
