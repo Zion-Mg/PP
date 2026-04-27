@@ -1,10 +1,12 @@
+import { PrismaClient } from "@prisma/client";
+
 import { prisma } from "@/lib/db";
-import { env } from "@/lib/env";
+import { getDefaultEventId } from "@/lib/env";
 import { ApiError } from "@/lib/errors";
 
-export const resolveEventId = async (eventId?: string | null) => {
+export const resolveEventId = async (eventId?: string | null, client: PrismaClient = prisma) => {
   if (eventId) {
-    const existingEvent = await prisma.event.findUnique({
+    const existingEvent = await client.event.findUnique({
       where: { id: eventId },
       select: { id: true },
     });
@@ -16,9 +18,11 @@ export const resolveEventId = async (eventId?: string | null) => {
     return existingEvent.id;
   }
 
-  if (env.NEXT_PUBLIC_DEFAULT_EVENT_ID) {
-    const defaultEvent = await prisma.event.findUnique({
-      where: { id: env.NEXT_PUBLIC_DEFAULT_EVENT_ID },
+  const defaultEventId = getDefaultEventId();
+
+  if (defaultEventId) {
+    const defaultEvent = await client.event.findUnique({
+      where: { id: defaultEventId },
       select: { id: true },
     });
 
@@ -27,7 +31,7 @@ export const resolveEventId = async (eventId?: string | null) => {
     }
   }
 
-  const firstEvent = await prisma.event.findFirst({
+  const firstEvent = await client.event.findFirst({
     orderBy: [{ eventDate: "asc" }, { createdAt: "asc" }],
     select: { id: true },
   });

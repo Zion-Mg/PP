@@ -2,10 +2,10 @@ import { SignJWT, jwtVerify } from "jose";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 
-import { env } from "@/lib/env";
+import { getJwtSecret } from "@/lib/env";
 import { ApiError } from "@/lib/errors";
 
-const secret = new TextEncoder().encode(env.JWT_SECRET);
+const getSecret = () => new TextEncoder().encode(getJwtSecret());
 
 const authPayloadSchema = z.object({
   sub: z.string().uuid(),
@@ -20,10 +20,10 @@ export const createAdminToken = async (payload: AdminJwtPayload) =>
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("12h")
-    .sign(secret);
+    .sign(getSecret());
 
 export const verifyAdminToken = async (token: string) => {
-  const { payload } = await jwtVerify(token, secret);
+  const { payload } = await jwtVerify(token, getSecret());
   return authPayloadSchema.parse(payload);
 };
 

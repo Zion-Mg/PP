@@ -1,8 +1,8 @@
 import Ably from "ably";
 
-import { env } from "@/lib/env";
+import { getAblyApiKey } from "@/lib/env";
 
-const ably = new Ably.Rest(env.ABLY_API_KEY);
+const getAblyClient = () => new Ably.Rest(getAblyApiKey());
 
 export const GALLERY_CHANNEL = "gallery-updates";
 
@@ -10,6 +10,7 @@ export const publishGalleryEvent = async (
   eventName: "photo_uploaded" | "photo_approved" | "photo_deleted" | "photo_featured",
   data: Record<string, unknown>,
 ) => {
+  const ably = getAblyClient();
   const channel = ably.channels.get(GALLERY_CHANNEL);
   await channel.publish(eventName, {
     ...data,
@@ -18,6 +19,6 @@ export const publishGalleryEvent = async (
 };
 
 export const createAblyTokenRequest = async (clientId: string) =>
-  ably.auth.createTokenRequest({
+  getAblyClient().auth.createTokenRequest({
     clientId,
   });

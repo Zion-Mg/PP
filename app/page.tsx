@@ -45,7 +45,7 @@ export default function LandingPage() {
   return (
     <main className="relative min-h-screen w-full overflow-hidden">
       <div className="absolute inset-0 z-0">
-        <Image src="/images/hero-wedding.jpg" alt="Wedding background" fill className="object-cover" priority quality={90} />
+        <Image src="/images/landing-wed-pic.jpeg" alt="Couple portrait background" fill className="object-cover object-center" priority quality={90} />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black/70" />
       </div>
 

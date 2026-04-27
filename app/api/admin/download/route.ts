@@ -4,8 +4,8 @@ import { handleRouteError } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ApiError } from "@/lib/errors";
+import { getSupabaseEnv } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase";
-import { env } from "@/lib/env";
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
       throw new ApiError(404, "Photo not found.");
     }
 
-    const { data, error } = await supabaseAdmin.storage.from(env.SUPABASE_STORAGE_BUCKET).download(photo.storagePath);
+    const supabaseEnv = getSupabaseEnv();
+    const { data, error } = await supabaseAdmin.storage.from(supabaseEnv.bucket).download(photo.storagePath);
 
     if (error || !data) {
       throw new ApiError(502, "The image could not be downloaded right now.", error?.message);

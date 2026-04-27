@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDropzone } from "react-dropzone";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Upload,
   X,
@@ -19,6 +20,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { parseApiResponse } from "@/lib/client-api";
+import { MAX_SOURCE_IMAGE_SIZE_BYTES } from "@/lib/upload-config";
 
 interface UploadedFile {
   id: string;
@@ -49,7 +52,7 @@ export default function UploadPage() {
     const fetchEvent = async () => {
       try {
         const response = await fetch("/api/event/current");
-        const data = await response.json();
+        const data = await parseApiResponse<{ event: EventPayload | null; error?: string }>(response);
 
         if (!response.ok) {
           throw new Error(data.error || "Unable to load the active event.");
@@ -94,12 +97,10 @@ export default function UploadPage() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      "image/jpeg": [".jpeg", ".jpg"],
-      "image/png": [".png"],
-      "image/webp": [".webp"],
+      "image/*": [],
     },
     maxFiles: 5 - files.length,
-    maxSize: 10 * 1024 * 1024,
+    maxSize: MAX_SOURCE_IMAGE_SIZE_BYTES,
     disabled: files.length >= 5 || isUploading,
   });
 
@@ -142,14 +143,14 @@ export default function UploadPage() {
         body: formData,
       });
 
-      const data = await response.json();
+      const data = await parseApiResponse<{ message?: string; error?: string }>(response);
 
       if (!response.ok) {
         throw new Error(data.error || "Upload failed.");
       }
 
       setFiles((prev) => prev.map((file) => ({ ...file, progress: 100 })));
-      setUploadMessage(data.message);
+      setUploadMessage(data.message || "Photos uploaded successfully.");
       setIsComplete(true);
       toast.success("Photos uploaded successfully.");
     } catch (error) {
@@ -242,8 +243,20 @@ export default function UploadPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
+    <main className="relative min-h-screen overflow-hidden bg-background">
+      <div className="absolute inset-0">
+        <Image
+          src="/images/upload-background-lensenest.png"
+          alt="Decorative floral upload background"
+          fill
+          className="object-cover"
+          priority
+          quality={90}
+        />
+        <div className="absolute inset-0 bg-background/82 backdrop-blur-[2px]" />
+      </div>
+
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <Link
             href="/"
@@ -257,7 +270,7 @@ export default function UploadPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl px-6 py-12">
+      <div className="relative z-10 mx-auto max-w-2xl px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -265,7 +278,7 @@ export default function UploadPage() {
         >
           <h2 className="font-serif text-3xl text-foreground sm:text-4xl">Share Your Moments</h2>
           <p className="mt-3 font-sans text-muted-foreground">
-            Upload up to 5 photos in JPEG, PNG, or WEBP format.
+            Upload 1 to 5 photos at a time. Large images are optimized automatically before storage.
           </p>
           <p className="mt-2 font-sans text-sm text-muted-foreground">
             {isLoadingEvent
@@ -284,7 +297,7 @@ export default function UploadPage() {
         >
           <div
             {...getRootProps()}
-            className={`relative rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-300 ${
+            className={`relative rounded-2xl border-2 border-dashed bg-white/70 p-8 text-center shadow-sm backdrop-blur-sm transition-all duration-300 ${
               isDragActive
                 ? "border-primary bg-primary/5"
                 : files.length >= 5 || isUploading
@@ -310,7 +323,11 @@ export default function UploadPage() {
             </div>
           </div>
 
-          <p className="mt-3 text-center font-sans text-sm text-muted-foreground">{files.length}/5 photos selected</p>
+          <p className="mt-3 text-center font-sans text-sm text-muted-foreground">
+            {files.length === 0
+              ? "Choose between 1 and 5 photos for this upload."
+              : `${files.length} ${files.length === 1 ? "photo" : "photos"} selected. You can upload up to 5 at a time.`}
+          </p>
         </motion.div>
 
         <AnimatePresence>
@@ -375,7 +392,7 @@ export default function UploadPage() {
             placeholder="Enter your name"
             value={uploaderName}
             onChange={(event) => setUploaderName(event.target.value)}
-            className="mt-2 rounded-xl border-border bg-card font-sans"
+            className="mt-2 rounded-xl border-border bg-white/80 font-sans"
           />
         </motion.div>
 

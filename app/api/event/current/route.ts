@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { handleRouteError } from "@/lib/api";
-import { prisma } from "@/lib/db";
+import { withPrismaRetry } from "@/lib/db";
 import { resolveEventId } from "@/lib/events";
 
 export async function GET() {
   try {
-    const eventId = await resolveEventId();
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
+    const event = await withPrismaRetry(async (client) => {
+      const eventId = await resolveEventId(undefined, client);
+      return client.event.findUnique({
+        where: { id: eventId },
+      });
     });
 
     return NextResponse.json({

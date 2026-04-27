@@ -8,6 +8,7 @@ import { ArrowLeft, Camera, X, Star, ChevronLeft, ChevronRight, LoaderCircle } f
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { parseApiResponse } from "@/lib/client-api";
 
 interface GalleryPhoto {
   id: string;
@@ -26,11 +27,15 @@ export default function GalleryPage() {
   useEffect(() => {
     let active = true;
     let realtime: Ably.Realtime | null = null;
+    let channel: {
+      subscribe: (listener: () => void) => void;
+      unsubscribe: () => void;
+    } | null = null;
 
     const loadGallery = async () => {
       try {
         const response = await fetch("/api/gallery");
-        const data = await response.json();
+        const data = await parseApiResponse<{ photos: GalleryPhoto[]; error?: string }>(response);
 
         if (!response.ok) {
           throw new Error(data.error || "Unable to load the gallery.");
@@ -55,7 +60,7 @@ export default function GalleryPage() {
           authUrl: `/api/realtime/token?clientId=gallery-${crypto.randomUUID()}`,
         });
 
-        const channel = realtime.channels.get("gallery-updates");
+        channel = realtime.channels.get("gallery-updates");
         channel.subscribe(() => {
           void loadGallery();
         });
@@ -69,7 +74,11 @@ export default function GalleryPage() {
 
     return () => {
       active = false;
-      realtime?.close();
+      try {
+        channel?.unsubscribe();
+      } catch {
+        // Ignore teardown errors during route transitions and Fast Refresh.
+      }
     };
   }, []);
 

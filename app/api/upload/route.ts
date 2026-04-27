@@ -7,7 +7,8 @@ import { resolveEventId } from "@/lib/events";
 import { ApiError } from "@/lib/errors";
 import { applyRateLimit } from "@/lib/rate-limit";
 import { uploadPhotoToStorage } from "@/lib/storage";
-import { MAX_UPLOADS_PER_SESSION, sanitizeAndCompressImage } from "@/lib/uploads";
+import { MAX_UPLOADS_PER_SESSION } from "@/lib/upload-config";
+import { sanitizeAndCompressImage } from "@/lib/uploads";
 import { uploadRouteSchema } from "@/lib/validators";
 
 export const runtime = "nodejs";

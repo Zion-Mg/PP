@@ -1,10 +1,14 @@
 import sharp from "sharp";
 
 import { ApiError } from "@/lib/errors";
+import {
+  MAX_IMAGE_DIMENSION,
+  MAX_SOURCE_IMAGE_SIZE_BYTES,
+  MAX_UPLOADS_PER_SESSION,
+  TARGET_COMPRESSED_IMAGE_BYTES,
+} from "@/lib/upload-config";
 
-export const MAX_UPLOADS_PER_SESSION = 5;
-export const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
-export const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const WEBP_QUALITIES = [82, 74, 66, 58];
 
 const extensionByType: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -13,7 +17,7 @@ const extensionByType: Record<string, string> = {
 };
 
 export type SanitizedUpload = {
-  buffer: Buffer;
+  buffer: Buffer<ArrayBufferLike>;
   contentType: string;
   extension: string;
   size: number;
@@ -26,12 +30,12 @@ export const sanitizeFilename = (value: string) =>
     .replace(/^-+|-+$/g, "") || "image";
 
 export const validateImageFile = (file: File) => {
-  if (!ALLOWED_TYPES.has(file.type)) {
-    throw new ApiError(400, "Unsupported file type. Please upload JPEG, PNG, or WEBP images only.");
+  if (!file.type.startsWith("image/")) {
+    throw new ApiError(400, "Unsupported file type. Please upload an image file.");
   }
 
-  if (file.size > MAX_IMAGE_SIZE_BYTES) {
-    throw new ApiError(400, "Each image must be 10MB or smaller.");
+  if (file.size > MAX_SOURCE_IMAGE_SIZE_BYTES) {
+    throw new ApiError(400, "Each original image must be 50MB or smaller before optimization.");
   }
 };
 
@@ -39,32 +43,42 @@ export const sanitizeAndCompressImage = async (file: File): Promise<SanitizedUpl
   validateImageFile(file);
 
   const inputBuffer = Buffer.from(await file.arrayBuffer());
-  const pipeline = sharp(inputBuffer, { failOn: "warning" }).rotate();
+  const basePipeline = sharp(inputBuffer, { failOn: "warning" })
+    .rotate()
+    .resize({
+      width: MAX_IMAGE_DIMENSION,
+      height: MAX_IMAGE_DIMENSION,
+      fit: "inside",
+      withoutEnlargement: true,
+    });
+
+  const pipeline = basePipeline.clone();
   const metadata = await pipeline.metadata();
 
   if (!metadata.width || !metadata.height) {
     throw new ApiError(400, "One of the uploaded files is not a valid image.");
   }
 
-  let output: Buffer;
+  let output: Buffer<ArrayBufferLike> = Buffer.from([]);
 
-  switch (file.type) {
-    case "image/png":
-      output = await pipeline.png({ compressionLevel: 9, adaptiveFiltering: true }).toBuffer();
+  for (const quality of WEBP_QUALITIES) {
+    output = await basePipeline
+      .clone()
+      .webp({
+        quality,
+        effort: 6,
+      })
+      .toBuffer();
+
+    if (output.byteLength <= TARGET_COMPRESSED_IMAGE_BYTES) {
       break;
-    case "image/webp":
-      output = await pipeline.webp({ quality: 82 }).toBuffer();
-      break;
-    case "image/jpeg":
-    default:
-      output = await pipeline.jpeg({ quality: 84, mozjpeg: true }).toBuffer();
-      break;
+    }
   }
 
   return {
     buffer: output,
-    contentType: file.type,
-    extension: extensionByType[file.type],
+    contentType: "image/webp",
+    extension: extensionByType["image/webp"],
     size: output.byteLength,
   };
 };
