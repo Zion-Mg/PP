@@ -36,8 +36,8 @@ export default function LandingPage() {
     void loadEvent();
   }, []);
 
-  const heading = event?.coupleNames || "Sarah & James";
-  const subheading = event ? format(new Date(event.eventDate), "MMMM d, yyyy") : "June 15, 2024";
+  const heading = event?.coupleNames || "Sasi & Tash";
+  const subheading = event ? format(new Date(event.eventDate), "MMMM d, yyyy") : "May 02, 2026";
   const body = event
     ? `Help us capture every beautiful moment from ${event.eventName}.`
     : "Help us capture every beautiful moment from our special day.";
@@ -45,12 +45,33 @@ export default function LandingPage() {
   return (
     <main className="relative min-h-screen w-full overflow-hidden">
       <div className="absolute inset-0 z-0">
-        <Image src="/images/landing-wed-pic.jpeg" alt="Couple portrait background" fill className="object-cover object-center" priority quality={90} />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black/70" />
+        <Image
+          src="/images/landing-wed-pic.jpeg"
+          alt="Couple portrait background"
+          fill
+          sizes="100vw"
+          className="scale-105 object-cover object-[52%_center] blur-[2px]"
+          priority
+          quality={100}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/34 via-black/52 to-black/74" />
       </div>
 
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 py-12">
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: "easeOut" }} className="flex max-w-lg flex-col items-center text-center">
+      <div className="absolute inset-y-0 right-0 z-[1] hidden items-center justify-end pr-6 lg:flex xl:pr-12">
+        <Image
+          src="/images/landing-wed-pic.jpeg"
+          alt="Sasi and Tash portrait"
+          width={860}
+          height={1280}
+          priority
+          quality={100}
+          className="h-[94vh] w-auto max-w-none object-contain object-right opacity-95 drop-shadow-2xl"
+        />
+        <div className="absolute inset-y-0 right-0 w-40 bg-gradient-to-l from-black/55 to-transparent" />
+      </div>
+
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 py-12 lg:items-start lg:px-16 xl:px-24">
+        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: "easeOut" }} className="flex max-w-lg flex-col items-center text-center lg:items-start lg:text-left">
           <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.3, duration: 0.6 }} className="mb-6">
             <div className="h-px w-24 bg-primary" />
           </motion.div>
